@@ -18,7 +18,7 @@ header('Content-type: application/json');
 \$output = array(
     hostname  => gethostname(),
     ip => getHostByName(getHostName()),
-    timestampmilli => intval(microtime(true)*1000)
+    timestampmicro => microtime(true)
 );
 echo json_encode(\$output);
 ?>
@@ -36,9 +36,12 @@ mv /tmp/yq /usr/bin
 echo "Update netplan config to include VIP"
 cp /etc/netplan/50-cloud-init.yaml /tmp/50-cloud-init.yaml
 cp /etc/netplan/50-cloud-init.yaml /tmp/50-cloud-init.yaml.orig
-yq -i '.network.ethernets.eth0 += {"addresses" : ["10.10.15.15/32"]}' /tmp/50-cloud-init.yaml
+yq -i '.network.ethernets.eth0 += {"addresses" : ["100.64.0.1/32"]}' /tmp/50-cloud-init.yaml
 cp /tmp/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml
 netplan apply
 apachectl restart
+
+echo "Disable cloud-init"
+echo "network: {config: disabled}" > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 
 cd $OLD_PWD
