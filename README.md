@@ -42,6 +42,9 @@ One issue I ran into was that Azure's SDN appears to have anti-flapping protecti
 
 Testing the failover by directly issuing commands to ExaBGP on the watcher node, allowed me see failover times in the 0.9s to 5.4s range.
 
+*N.B.*
+On the watcher2 VM, I stuck with using quagga for debugging as the vtysh command has more options than the exabgpcli command.
+
 The details of how the test environment was built including all scripts is the subject of the rest of this article.
 
 # 2. _Implementation_
@@ -93,6 +96,7 @@ az login
 ```
 
 Set powershell environment variables - based on table above
+
 ```powershell-interactive
 set REGION uksouth
 set RG next-hop-ip-rg
@@ -146,8 +150,9 @@ az network vnet subnet create -g $RG --vnet-name $VNET_Name -n $RouteServer_Subn
 
 #Create Bastion Subnet
 az network vnet subnet create -g $RG --vnet-name $VNET_Name -n $Bastion_Subnet_Name --address-prefixes $Bastion_Subnet_CIDR
-# N.B. You need to enable Native Client Support via the portal in the Bastion -> Configuration Blade
-
+```
+N.B. You need to enable Native Client Support via the portal in the Bastion -> Configuration Blade
+```powershell-interactive
 # Query Default Subnet ID
 set Default_Subnet_Id (az network vnet subnet show -g $RG --vnet-name $VNET_Name --name $Default_Subnet_Name  --query "{objectID:id}" --output tsv)
 
@@ -180,7 +185,7 @@ az network vnet subnet update -g $RG -n $Default_Subnet_Name --vnet-name $VNET_N
 ## 3.2 Webserver VMs
 Use the following commands to create the VM's:
 
-Generate SSH key - you can leave the passphrase black for testing
+Generate SSH key - you can leave the passphrase black for testing. The directory is created within the repo directory as subsequent commands use relative paths:
 ```powershell-interactive
 mkdir .ssh
 ssh-keygen -b 4096 -f "$SSH_KEY_PRIV"
@@ -190,20 +195,8 @@ ssh-keygen -b 4096 -f "$SSH_KEY_PRIV"
 # Webserver 1
 az vm create --resource-group $RG_VM --name $WS1_Hostname --image $VM_Image --custom-data assets\custom-webserver.sh --admin-username $VM_User --ssh-key-values $SSH_KEY_PUB --zone 1 --private-ip-address $WS1_IP --subnet $Default_Subnet_Id --size $VM_Size --public-ip-address '""' --nsg '""' --no-wait
 
-# Get NICname (May not be needed)
-set WS1_NIC_Name (az network nic list --resource-group $RG_VM --output tsv --query "[?contains(name, 'ws1')].name")
-
-# Enable IP Forwarding (May not be needed)
-az network nic update --name $WS1_NIC_Name --resource-group $RG_VM --ip-forwarding true
-
 # Webserver 2
 az vm create --resource-group $RG_VM --name $WS2_Hostname --image $VM_Image --custom-data assets\custom-webserver.sh --admin-username $VM_User --ssh-key-values $SSH_KEY_PUB --zone 2 --private-ip-address $WS2_IP --subnet $Default_Subnet_Id --size $VM_Size --public-ip-address '""' --nsg '""' --no-wait
-
-# Get NICname (May not be needed)
-set WS2_NIC_Name (az network nic list --resource-group $RG_VM --output tsv --query "[?contains(name, 'ws2')].name")
-
-# Enable IP Forwarding (May not be needed)
-az network nic update --name $WS2_NIC_Name --resource-group $RG_VM --ip-forwarding true
 ```
 
 ## 3.3 Load Tester VMs
@@ -230,36 +223,33 @@ az vm create --resource-group $RG_VM --name watch2 --image $VM_Image --custom-da
 From the powershell cli or the new Windows Terminal, do the following:
 
 ```powershell-interactive
-# Login
-az login
+# Find VM Id
+set VM_Id (az vm list --resource-group $RG_VM --output tsv --query "[?contains(name, 'watch1')].id")
+# Open SSH connection
+az network bastion ssh --name $Bastion_Name --resource-group $RG --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key $SSH_KEY_PRIV
+
+set VM_Id (az vm list --resource-group $RG_VM --output tsv --query "[?contains(name, 'watch2')].id")
+# Open SSH connection
+az network bastion ssh --name $Bastion_Name --resource-group $RG --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key $SSH_KEY_PRIV
 
 # Find VM Id
-set VM_Id (az vm list --resource-group "next-hop-ip-vm-rg" --output tsv --query "[?contains(name, 'watch1')].id")
+set VM_Id (az vm list --resource-group $RG_VM --output tsv --query "[?contains(name, 'lt1')].id")
 # Open SSH connection
-az network bastion ssh --name "next-hop-ip-bastion" --resource-group "next-hop-ip-rg" --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key .ssh\id_rsa.nexthop
-
-set VM_Id (az vm list --resource-group "next-hop-ip-vm-rg" --output tsv --query "[?contains(name, 'watch2')].id")
-# Open SSH connection
-az network bastion ssh --name "next-hop-ip-bastion" --resource-group "next-hop-ip-rg" --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key .ssh\id_rsa.nexthop
+az network bastion ssh --name $Bastion_Name --resource-group $RG --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key $SSH_KEY_PRIV
 
 # Find VM Id
-set VM_Id (az vm list --resource-group "next-hop-ip-vm-rg" --output tsv --query "[?contains(name, 'lt1')].id")
+set VM_Id (az vm list --resource-group $RG_VM --output tsv --query "[?contains(name, 'ws1')].id")
 # Open SSH connection
-az network bastion ssh --name "next-hop-ip-bastion" --resource-group "next-hop-ip-rg" --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key .ssh\id_rsa.nexthop
+az network bastion ssh --name $Bastion_Name --resource-group $RG --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key $SSH_KEY_PRIV
 
 # Find VM Id
-set VM_Id (az vm list --resource-group "next-hop-ip-vm-rg" --output tsv --query "[?contains(name, 'ws1')].id")
+set VM_Id (az vm list --resource-group $RG_VM --output tsv --query "[?contains(name, 'ws2')].id")
 # Open SSH connection
-az network bastion ssh --name "next-hop-ip-bastion" --resource-group "next-hop-ip-rg" --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key .ssh\id_rsa.nexthop
-
-# Find VM Id
-set VM_Id (az vm list --resource-group "next-hop-ip-vm-rg" --output tsv --query "[?contains(name, 'ws2')].id")
-# Open SSH connection
-az network bastion ssh --name "next-hop-ip-bastion" --resource-group "next-hop-ip-rg" --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key .ssh\id_rsa.nexthop
+az network bastion ssh --name $Bastion_Name --resource-group $RG --target-resource-id $VM_Id --auth-type ssh-key --username chris --ssh-key $SSH_KEY_PRIV
 
 # Query routeserver for peering connections
-az network routeserver peering list-learned-routes --name "watcher" --routeserver "next-hop-ip-routeserver" --resource-group "next-hop-ip-rg"
-az network nic show-effective-route-table --name lt1VMNic --resource-group next-hop-ip-vm-rg --output table
+az network routeserver peering list-learned-routes --name "watcher" --routeserver $Route_Server_Name --resource-group $RG
+az network nic show-effective-route-table --name lt1VMNic --resource-group $RG_VM --output table
 ```
 
 # 5. _Manually Updates ExaBGP Routes_
@@ -282,7 +272,7 @@ sudo bash -c 'echo "announce route 100.64.0.1/32 next-hop 10.10.0.5" >/etc/exabg
 $vms = @('lt1','watch1','watch2','ws1','ws2')
 Foreach ($vm in $vms) {
     Write-Host $vm;
-    az vm start --no-wait --resource-group next-hop-ip-vm-rg --name $vm
+    az vm start --no-wait --resource-group $RG_VM --name $vm
 }
 ```
 
@@ -291,11 +281,11 @@ Foreach ($vm in $vms) {
 $vms = @('lt1','watch1','watch2','ws1','ws2')
 Foreach ($vm in $vms) {
     Write-Host $vm;
-    az vm stop --no-wait --resource-group next-hop-ip-vm-rg --name $vm
+    az vm stop --no-wait --resource-group $RG_VM --name $vm
 }
 Foreach ($vm in $vms) {
     Write-Host $vm;
-    az vm deallocate --no-wait --resource-group next-hop-ip-vm-rg --name $vm
+    az vm deallocate --no-wait --resource-group $RG_VM --name $vm
 }
 ```
 
