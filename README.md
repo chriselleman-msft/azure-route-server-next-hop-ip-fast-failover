@@ -301,6 +301,6 @@ Foreach ($vm in $vms) {
 
 # _References_
 
-https://github.com/Exa-Networks/exabgp - ExaBGP Github
-https://github.com/AndrewBryson/azure-route-server-failover - Andrew Bryson's ExaBGP Blog Post
-https://github.com/adstuart/azure-routeserver-anycast - Adam Stuart's Route Server Anycast Blog Post
+- https://github.com/Exa-Networks/exabgp - ExaBGP Github
+- https://github.com/AndrewBryson/azure-route-server-failover - Andrew Bryson's ExaBGP Blog Post
+- https://github.com/adstuart/azure-routeserver-anycast - Adam Stuart's Route Server Anycast Blog Post
