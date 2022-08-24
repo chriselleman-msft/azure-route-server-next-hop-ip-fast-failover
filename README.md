@@ -4,17 +4,30 @@ description: Extend your on-premises subnets into Azure using Linux
 services: virtualnetwork
 author: chriselleman-msft
 
-ms.service: virtualnetwork
-ms.topic: conceptual
-ms.date: 08/08/2022
-ms.author: chriselleman-msft
-
 ---
 
 Azure Route Server Next Hop IP Fast Failover
 ==============
-
 >Applies to: Azure, Linux, Route Server
+
+- [Azure Route Server Next Hop IP Fast Failover](#azure-route-server-next-hop-ip-fast-failover)
+- [1. _Architecture Overview_](#1-architecture-overview)
+- [2. _Implementation_](#2-implementation)
+  - [2.1 Planning](#21-planning)
+  - [2.2 CLI Configuration](#22-cli-configuration)
+- [3. _Build Envionrment_](#3-build-envionrment)
+  - [3.1 VNET](#31-vnet)
+  - [3.2 Webserver VMs](#32-webserver-vms)
+  - [3.3 Load Tester VMs](#33-load-tester-vms)
+  - [3.4 Watcher VMs](#34-watcher-vms)
+- [4. _Connect via Bastion and Native_Client_](#4-connect-via-bastion-and-native_client)
+- [5. _Manually Updates ExaBGP Routes_](#5-manually-updates-exabgp-routes)
+- [_Miscellenous Helper Commands_](#miscellenous-helper-commands)
+  - [Manual Log Test Command](#manual-log-test-command)
+  - [Start all VMs](#start-all-vms)
+  - [Stop all VMs](#stop-all-vms)
+- [_References_](#references)
+
 
 # 1. _Architecture Overview_
 
