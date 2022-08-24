@@ -31,16 +31,18 @@ Azure Route Server Next Hop IP Fast Failover
 
 # 1. _Architecture Overview_
 
-The premise of this article is to understand whether traditional low-latency applications (such as voip) which use a floating virtual IP (VIP) can be migrated to Azure and achieve failover times of 5 seconds or less. Azure has supported VIPs for a long time, the standard method is to use a route table entry for the VIP with the next-hop set to the virtual appliance or VM you want to send the traffic to; the main issue with this approach is the update time in the event of a failure as this seemed to be anywhere from 10 seconds to 60 seconds as the request has to make its was through the Azure API - this is fine for web applications but for low-latency applications is not nearly fast enough.
+The premise of this article is to understand whether traditional low-latency applications (such as VOIP) which use a floating virtual IP (VIP) can be migrated to Azure and achieve failover times of 5 seconds or less. Azure has supported VIPs for a long time, the standard method is to use a route table entry for the VIP address with a /32 subnet, with the next-hop set to the virtual appliance or VM you want to send the traffic to; the main issue with this approach is the update time in the event of a failure as this seemed to be anywhere from 10 seconds to 60 seconds, as the request has to make its was through the Azure API - this is fine for web applications but for low-latency applications is not fast enough.
 
-On 1st Aug, 2022 Microsoft GA'd a new feature for route server called [next-hop-ip](https://docs.microsoft.com/en-gb/azure/route-server/next-hop-ip), this allows Azure's Software Defined Network to be manipulated directly using BGP instead of going through the API, and means any BGP routes you inject into route server are propagated to all VM NIC's immediately.
+On 1st Aug, 2022 Microsoft GA'd a new feature for route server called [next-hop-ip](https://docs.microsoft.com/en-gb/azure/route-server/next-hop-ip), this allows Azure's Software Defined Network (SDN) to be manipulated directly using BGP instead of going through the API, and means any BGP routes you inject into route server are propagated to all VM NIC's immediately.
 
-One issue I ran into was that Azure's SDN appears to have anti-flapping protection included, as routes can only be updated once every 30 seconds. Initially the BGP server I was using was [BIRD](https://bird.network.cz/) and [Quagga](https://www.quagga.net/), the next-hop update involved changing the config and restarting the processes, this meant that routes were first of all withdrawn (which was a routing change) and then new routes added (second change) which was taking 30 seconds to propagate. Changing over to [ExaBGP](https://github.com/Exa-Networks/exabgp) gave me full control and meant I could just issue a single routing update which would be propagated immediately.
+One issue I ran into was that Azure's SDN appears to have anti-flapping protection included, as routes can only be updated once every 30 seconds. Initially the BGP server I was using was [BIRD](https://bird.network.cz/) and then [Quagga](https://www.quagga.net/), the next-hop update involved changing the config and restarting the processes, this meant that routes were first of all withdrawn (which was a routing change) and then new routes added (second change) which was then taking 30 seconds to propagate. Changing over to [ExaBGP](https://github.com/Exa-Networks/exabgp) gave me full control and meant I could announce a single routing update which would be propagated immediately.
 
 ![Overview Architecture showing an customer VNET networks with a single subnet, with route server attached, along with 2 webservers with a floating IP a watcher/syslog server, and a load injector](docs/overview-architecture.png)
   *Figure 1: Architecture Overview.*
 
-Testing the failover by directly issuing commands to ExaBGP, running on the watcher node, allowed me see failover times in the 0.9s to 5.4s range.
+Testing the failover by directly issuing commands to ExaBGP on the watcher node, allowed me see failover times in the 0.9s to 5.4s range.
+
+The details of how the test environment was built including all scripts is the subject of the rest of this article.
 
 # 2. _Implementation_
 ## 2.1 Planning
